@@ -1,90 +1,113 @@
 using UnityEngine;
-using System.Collections;
+using UnityEngine.UI;
+// Opcional: se você usa TextMeshPro, deixe o using abaixo e preencha o campo scoreTMP no Inspector
+// using TMPro;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("Prefabs / Referências")]
-    public GameObject asteroidLargePrefab;
-    public GameObject playerPrefab;
-    public Transform playerSpawn;
+    [Header("Player")]
+    public GameObject playerPrefab;        // Prefab do jogador
+    public Transform playerSpawn;          // Posição de respawn
 
-    [Header("Spawns")]
-    public float spawnInterval = 2f;
-    public float minSpawnDistanceFromPlayer = 4f;
+    [Header("Jogo")]
+    public int lives = 3;                  // Vidas iniciais
+    public float respawnDelay = 1.0f;      // Tempo para respawn do player
 
-    Transform playerTransform;
+    [Header("UI (opcional)")]
+    public Text scoreText;                 // UI Text padrão
+    // public TMP_Text scoreTMP;           // Se usar TextMeshPro, descomente acima e preencha no Inspector
+
+    int score = 0;
+    GameObject currentPlayer;
 
     void Start()
     {
+        UpdateUI();
         SpawnPlayer();
-        StartCoroutine(SpawnLoop());
     }
 
-    IEnumerator SpawnLoop()
+    /// <summary>
+    /// Adiciona pontos ao placar (usado por inimigos/asteroides destruídos).
+    /// </summary>
+    public void AddScore(int value)
     {
-        yield return new WaitForSeconds(1f);
-        while (true)
+        score += Mathf.Max(0, value);
+        UpdateUI();
+    }
+
+    /// <summary>
+    /// Chamado quando o jogador é atingido (por asteroide, inimigo, tiro inimigo, etc).
+    /// </summary>
+    public void OnPlayerHit()
+    {
+        // Se já está “morto” e aguardando respawn, evita múltiplas contagens.
+        if (currentPlayer == null || !currentPlayer.activeInHierarchy)
         {
-            SpawnOneAsteroid();
-            yield return new WaitForSeconds(spawnInterval);
+            // já está sem player ativo; ainda assim processa vida/respawn abaixo
+        }
+        else
+        {
+            // desativa o player atual
+            currentPlayer.SetActive(false);
+        }
+
+        lives = Mathf.Max(0, lives - 1);
+        UpdateUI();
+
+        if (lives > 0)
+        {
+            // respawn após um pequeno atraso
+            Invoke(nameof(SpawnPlayer), respawnDelay);
+        }
+        else
+        {
+            // fim de jogo simples (você pode expandir com tela de Game Over, etc.)
+            Debug.Log("Game Over");
+            // opcional: desabilitar spawners, mostrar UI, etc.
         }
     }
 
+    /// <summary>
+    /// Instancia/respawna o jogador no ponto definido.
+    /// </summary>
     void SpawnPlayer()
     {
-        var p = Instantiate(playerPrefab, playerSpawn.position, Quaternion.identity);
-        playerTransform = p.transform;
-        UpdateAsteroidTargets();
-    }
-
-    void SpawnOneAsteroid()
-    {
-        if (!asteroidLargePrefab) { Debug.LogError("GameManager: asteroidLargePrefab não setado."); return; }
-        Camera cam = Camera.main;
-
-        // escolhe uma borda da tela
-        Vector2 edge = Random.value > 0.5f
-            ? new Vector2(Random.value, Random.value < 0.5f ? -0.05f : 1.05f)
-            : new Vector2(Random.value < 0.5f ? -0.05f : 1.05f, Random.value);
-
-        Vector3 world = cam.ViewportToWorldPoint(new Vector3(edge.x, edge.y, 0));
-        world.z = 0;
-
-        // evita spawn colado na nave
-        if (playerTransform != null)
+        if (playerPrefab == null || playerSpawn == null)
         {
-            int safety = 0;
-            while (Vector2.Distance(world, playerTransform.position) < minSpawnDistanceFromPlayer && safety++ < 8)
-            {
-                edge = Random.value > 0.5f
-                    ? new Vector2(Random.value, Random.value < 0.5f ? -0.05f : 1.05f)
-                    : new Vector2(Random.value < 0.5f ? -0.05f : 1.05f, Random.value);
-                world = cam.ViewportToWorldPoint(new Vector3(edge.x, edge.y, 0));
-                world.z = 0;
-            }
+            Debug.LogWarning("GameManager: defina Player Prefab e Player Spawn no Inspector.");
+            return;
         }
 
-        var go = Instantiate(asteroidLargePrefab, world, Quaternion.identity);
-        var a = go.GetComponent<Asteroid>();
-        if (a != null)
+        // Se existe um player antigo na cena (desativado), destrua para evitar duplicata oculta
+        if (currentPlayer != null)
         {
-            a.size = Asteroid.Size.Large;
-            a.target = playerTransform;
-            Vector2 dir = (playerTransform != null)
-                ? ((Vector2)(playerTransform.position - world)).normalized
-                : Random.insideUnitCircle.normalized;
-            dir = (dir + Random.insideUnitCircle * 0.2f).normalized;
-            a.Launch(dir);
+            Destroy(currentPlayer);
         }
+
+        currentPlayer = Instantiate(playerPrefab, playerSpawn.position, playerSpawn.rotation);
+        // Garante a tag (se você usa Tag para detecção)
+        if (!currentPlayer.CompareTag("Player"))
+            currentPlayer.tag = "Player";
     }
 
-    void UpdateAsteroidTargets()
+    /// <summary>
+    /// Atualiza texto de score/vidas se os campos estiverem atribuídos.
+    /// </summary>
+    void UpdateUI()
     {
-#if UNITY_2022_2_OR_NEWER
-        var all = Object.FindObjectsByType<Asteroid>(FindObjectsSortMode.None);
-#else
-        var all = Object.FindObjectsOfType<Asteroid>();
-#endif
-        foreach (var ast in all) ast.target = playerTransform;
+        if (scoreText != null)
+            scoreText.text = $"SCORE {score}   LIVES {lives}";
+
+        // Se usar TextMeshPro, descomente os campos/using lá em cima e esta linha:
+        // if (scoreTMP != null) scoreTMP.text = $"SCORE {score}   LIVES {lives}";
     }
+
+    // Helpers públicos (opcionais) para outros scripts consultarem o player atual
+    public Transform GetPlayerTransform()
+    {
+        return currentPlayer != null ? currentPlayer.transform : null;
+    }
+
+    public int GetScore() => score;
+    public int GetLives() => lives;
 }

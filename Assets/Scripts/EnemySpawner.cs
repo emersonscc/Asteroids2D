@@ -1,0 +1,104 @@
+using System.Collections;
+using UnityEngine;
+
+public class EnemySpawner : MonoBehaviour
+{
+    [Header("Prefab do inimigo")]
+    public GameObject enemyPrefab;
+
+    [Header("Tempo de spawn")]
+    public float firstDelay = 5f;         // atraso inicial
+    public float interval = 8f;           // intervalo médio entre spawns
+    public float intervalRandom = 3f;     // variação (+/-) no intervalo
+
+    [Header("Regras de spawn")]
+    public float minDistanceFromPlayer = 4f;   // não nascer muito perto do player
+    public float offscreenMargin = 0.05f;      // sair um pouco fora da viewport
+
+    Transform player; // alvo do inimigo
+
+    void Start()
+    {
+        // Tenta achar o player de forma robusta
+        var pc = FindFirstObjectByType<PlayerController>();
+        if (pc) player = pc.transform;
+        if (!player)
+        {
+            var go = GameObject.FindGameObjectWithTag("Player");
+            if (go) player = go.transform;
+        }
+
+        StartCoroutine(SpawnLoop());
+    }
+
+    IEnumerator SpawnLoop()
+    {
+        if (firstDelay > 0f)
+            yield return new WaitForSeconds(firstDelay);
+
+        while (true)
+        {
+            SpawnEnemy();
+
+            float wait = interval + Random.Range(-intervalRandom, intervalRandom);
+            if (wait < 2f) wait = 2f; // não deixa muito baixo
+            yield return new WaitForSeconds(wait);
+        }
+    }
+
+    void SpawnEnemy()
+    {
+        if (!enemyPrefab) return;
+
+        Camera cam = Camera.main;
+        if (!cam) return;
+
+        // Escolhe uma borda da viewport (com pequena margem fora da tela)
+        Vector2 edge = Random.value > 0.5f
+            ? new Vector2(Random.value, Random.value < 0.5f ? -offscreenMargin : 1f + offscreenMargin)
+            : new Vector2(Random.value < 0.5f ? -offscreenMargin : 1f + offscreenMargin, Random.value);
+
+        Vector3 pos = cam.ViewportToWorldPoint(new Vector3(edge.x, edge.y, 0f));
+        pos.z = 0f;
+
+        // Se estivermos muito perto do player, empurra para fora
+        if (player && Vector2.Distance(pos, player.position) < minDistanceFromPlayer)
+        {
+            Vector2 dir = (Vector2)(pos - (Vector3)player.position);
+            if (dir.sqrMagnitude < 0.01f) dir = Random.insideUnitCircle.normalized;
+            pos = player.position + (Vector3)(dir.normalized * minDistanceFromPlayer);
+        }
+
+        // Instancia o inimigo
+        var go = Instantiate(enemyPrefab, pos, Quaternion.identity);
+
+        // Configura o alvo explicitamente (mesmo que a tag falhe)
+        var enemy = go.GetComponent<Enemy>();
+        if (enemy)
+        {
+            // define o target
+            if (!player)
+            {
+                var pc = FindFirstObjectByType<PlayerController>();
+                if (pc) player = pc.transform;
+                if (!player)
+                {
+                    var pGo = GameObject.FindGameObjectWithTag("Player");
+                    if (pGo) player = pGo.transform;
+                }
+            }
+            enemy.target = player;
+
+            // Rotaciona o inimigo olhando para o player, se existir
+            if (player)
+            {
+                Vector2 toPlayer = (Vector2)(player.position - go.transform.position);
+                if (toPlayer.sqrMagnitude > 0.001f)
+                {
+                    float z = Vector2.SignedAngle(Vector2.up, toPlayer.normalized);
+                    go.transform.rotation = Quaternion.Euler(0f, 0f, z);
+                }
+            }
+        }
+    }
+}

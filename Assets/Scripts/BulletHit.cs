@@ -37,13 +37,24 @@ public class BulletHit : MonoBehaviour
     }
 
     void TryHit(Collider2D other)
+{
+    if (other == null) return;
+
+    // 1) Asteroide
+    if (other.TryGetComponent<Asteroid>(out var a))
     {
-        if (hasHit) return;             // <--- evita chamadas repetidas
-        if (other && other.TryGetComponent<Asteroid>(out var a))
-        {
-            hasHit = true;
-            a.Hit();
-            Destroy(gameObject);
-        }
+        a.Hit();
+        Destroy(gameObject);
+        return;
     }
+
+    // 2) Inimigo
+    if (other.TryGetComponent<Enemy>(out var e))
+    {
+        e.Hit(1);
+        Destroy(gameObject);
+        return;
+    }
+}
+    
 }
