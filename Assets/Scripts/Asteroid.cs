@@ -4,35 +4,43 @@ public class Asteroid : MonoBehaviour
 {
     public enum Size { Large, Medium, Small }
 
-    [Header("Tamanho / Split")]
+    [Header("Tamanho / Divisão")]
     public Size size = Size.Large;
-    public GameObject mediumPrefab; // usado quando Large quebra
-    public GameObject smallPrefab;  // usado quando Medium quebra
+    public GameObject mediumPrefab;   // usado quando Large quebra
+    public GameObject smallPrefab;    // usado quando Medium quebra
 
     [Header("Movimento")]
     public float minSpeed = 1.5f;
     public float maxSpeed = 3.5f;
 
     [Header("Mira opcional no Player")]
-    public Transform target;       // <- CAMPO QUE FALTAVA
+    public Transform target;
     public bool seekPlayer = false;
     public float seekStrength = 2f;
 
     Rigidbody2D rb;
+    bool isDead = false;              // trava contra múltiplos hits no mesmo frame
 
-    void Awake() => rb = GetComponent<Rigidbody2D>();
+    void Awake()
+    {
+        rb = GetComponent<Rigidbody2D>();
+    }
 
     public void Launch(Vector2 dir)
     {
         float speed = Random.Range(minSpeed, maxSpeed);
-        rb.linearVelocity = dir.normalized * speed;     // troque para rb.velocity se seu projeto usa 'velocity'
+        rb.linearVelocity = dir.normalized * speed;          // troque para rb.velocity se preferir
         rb.angularVelocity = Random.Range(-60f, 60f);
     }
 
     public void Hit()
     {
-        if (size == Size.Large) Split(mediumPrefab, Size.Medium);
+        if (isDead) return;           // evita “dividir” mais de uma vez
+        isDead = true;
+
+        if (size == Size.Large)      Split(mediumPrefab, Size.Medium);
         else if (size == Size.Medium) Split(smallPrefab, Size.Small);
+        // size == Small -> apenas destrói
 
         Destroy(gameObject);
     }
@@ -40,6 +48,7 @@ public class Asteroid : MonoBehaviour
     void Split(GameObject childPrefab, Size childSize)
     {
         if (!childPrefab) return;
+
         for (int i = 0; i < 2; i++)
         {
             Vector2 pos = (Vector2)transform.position + Random.insideUnitCircle * 0.5f;
@@ -48,7 +57,7 @@ public class Asteroid : MonoBehaviour
             if (a != null)
             {
                 a.size = childSize;
-                a.target = this.target; // herda o alvo (se existir)
+                a.target = this.target;           // herda alvo/configurações
                 a.seekPlayer = this.seekPlayer;
                 a.seekStrength = this.seekStrength;
                 a.Launch(Random.insideUnitCircle.normalized);
@@ -60,7 +69,7 @@ public class Asteroid : MonoBehaviour
     {
         ScreenWrap();
 
-        // "mira suave" opcional
+        // Mira suave opcional no player
         if (seekPlayer && target != null)
         {
             Vector2 to = (Vector2)(target.position - transform.position);
