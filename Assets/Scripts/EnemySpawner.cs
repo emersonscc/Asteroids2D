@@ -7,25 +7,26 @@ public class EnemySpawner : MonoBehaviour
     public GameObject enemyPrefab;
 
     [Header("Tempo de spawn")]
-    public float firstDelay = 5f;         // atraso inicial
+    public float firstDelay = 5f;         // atraso inicial antes do primeiro inimigo
     public float interval = 8f;           // intervalo médio entre spawns
     public float intervalRandom = 3f;     // variação (+/-) no intervalo
 
     [Header("Regras de spawn")]
-    public float minDistanceFromPlayer = 4f;   // não nascer muito perto do player
-    public float offscreenMargin = 0.05f;      // sair um pouco fora da viewport
+    public float minDistanceFromPlayer = 4f;   // evita nascer muito perto do player
+    public float offscreenMargin = 0.05f;      // margem fora da tela (viewport)
 
-    Transform player; // alvo do inimigo
+    private Transform player;                  // alvo a ser atribuído aos inimigos
 
     void Start()
     {
         // Tenta achar o player de forma robusta
         var pc = FindFirstObjectByType<PlayerController>();
         if (pc) player = pc.transform;
+
         if (!player)
         {
-            var go = GameObject.FindGameObjectWithTag("Player");
-            if (go) player = go.transform;
+            var pGo = GameObject.FindGameObjectWithTag("Player");
+            if (pGo) player = pGo.transform;
         }
 
         StartCoroutine(SpawnLoop());
@@ -41,7 +42,7 @@ public class EnemySpawner : MonoBehaviour
             SpawnEnemy();
 
             float wait = interval + Random.Range(-intervalRandom, intervalRandom);
-            if (wait < 2f) wait = 2f; // não deixa muito baixo
+            if (wait < 2f) wait = 2f; // limite mínimo razoável
             yield return new WaitForSeconds(wait);
         }
     }
@@ -50,7 +51,7 @@ public class EnemySpawner : MonoBehaviour
     {
         if (!enemyPrefab) return;
 
-        Camera cam = Camera.main;
+        var cam = Camera.main;
         if (!cam) return;
 
         // Escolhe uma borda da viewport (com pequena margem fora da tela)
@@ -61,7 +62,7 @@ public class EnemySpawner : MonoBehaviour
         Vector3 pos = cam.ViewportToWorldPoint(new Vector3(edge.x, edge.y, 0f));
         pos.z = 0f;
 
-        // Se estivermos muito perto do player, empurra para fora
+        // Se ficar perto demais do player, empurra para fora
         if (player && Vector2.Distance(pos, player.position) < minDistanceFromPlayer)
         {
             Vector2 dir = (Vector2)(pos - (Vector3)player.position);
@@ -72,24 +73,26 @@ public class EnemySpawner : MonoBehaviour
         // Instancia o inimigo
         var go = Instantiate(enemyPrefab, pos, Quaternion.identity);
 
-        // Configura o alvo explicitamente (mesmo que a tag falhe)
+        // Injeta o alvo explicitamente (mesmo que a tag falhe)
         var enemy = go.GetComponent<Enemy>();
         if (enemy)
         {
-            // define o target
+            // Garante o player (rebusca se necessário)
             if (!player)
             {
                 var pc = FindFirstObjectByType<PlayerController>();
                 if (pc) player = pc.transform;
+
                 if (!player)
                 {
                     var pGo = GameObject.FindGameObjectWithTag("Player");
                     if (pGo) player = pGo.transform;
                 }
             }
+
             enemy.target = player;
 
-            // Rotaciona o inimigo olhando para o player, se existir
+            // (Opcional) já rotaciona o inimigo olhando para o player
             if (player)
             {
                 Vector2 toPlayer = (Vector2)(player.position - go.transform.position);
@@ -102,3 +105,4 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 }
+

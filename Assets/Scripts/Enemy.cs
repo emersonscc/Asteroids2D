@@ -74,21 +74,28 @@ public class Enemy : MonoBehaviour
         return;
     }
 
-    var fp = firePoint ? firePoint : transform;   // fallback
+    // Se esqueceram de ligar no Inspector, usa o transform do Enemy
+    var fp = firePoint ? firePoint : transform;
+
     fireTimer = Mathf.Max(0.05f, fireCooldown);
 
+    // Nasce um pouco à frente para não colidir com o próprio colisor
     Vector2 pos = (Vector2)fp.position + (Vector2)fp.up * 0.1f;
-    var b = Instantiate(bulletPrefab, pos, fp.rotation);
+    Quaternion rot = fp.rotation;
+
+    var b = Instantiate(bulletPrefab, pos, rot);
     var brb = b.GetComponent<Rigidbody2D>();
-    var own = rb ? rb.linearVelocity : Vector2.zero; // troque p/ rb.velocity se seu projeto usa 'velocity'
+    var own = rb ? rb.linearVelocity : Vector2.zero; // troque para rb.velocity se seu projeto usa 'velocity'
 
-    if (brb) brb.linearVelocity = (Vector2)fp.up * bulletSpeed + own * 0.2f;
+    Vector2 dir = (Vector2)fp.up;
+    float speed = Mathf.Max(1f, bulletSpeed);
 
-    // Debug opcional pra ver no Console
+    if (brb)
+        brb.linearVelocity = dir * speed + own * 0.2f;
+
+    // Debug opcional:
     // Debug.Log($"[Enemy] Shoot {name} em {Time.time:F2}");
 }
-
-
 
     public void Hit(int damage = 1)
     {
