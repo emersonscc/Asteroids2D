@@ -18,10 +18,22 @@ public class EnemyBullet : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
+        // Acertou o player?
         if (other.CompareTag("Player") || other.GetComponent<PlayerController>())
         {
-            var gm = FindFirstObjectByType<GameManager>();
-            if (gm) gm.OnPlayerHit();  // << método do GameManager
+            // Prioriza usar PlayerHealth (contagem de hits)
+            var ph = other.GetComponent<PlayerHealth>();
+            if (ph)
+            {
+                ph.RegisterHit(1); // 1 hit por bala
+            }
+            else
+            {
+                // Fallback: comportamento antigo (morte imediata) se PlayerHealth não existir
+                var gm = FindFirstObjectByType<GameManager>();
+                if (gm) gm.OnPlayerHit();
+            }
+
             Destroy(gameObject);
         }
     }

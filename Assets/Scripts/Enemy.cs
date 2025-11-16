@@ -3,9 +3,8 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
 public class Enemy : MonoBehaviour
 {
-    [Header("Vida & Pontos")]
-    public int maxHealth = 3;
-    public int scoreOnKill = 100;
+    [Header("Alvo")]
+    public Transform target;              // Spawner define; fallback por Tag "Player" no Start
 
     [Header("Movimento")]
     public float moveSpeed = 3f;
@@ -13,14 +12,18 @@ public class Enemy : MonoBehaviour
     public bool screenWrap = true;
 
     [Header("Tiro")]
-    public Transform firePoint;           // filho "FirePoint"
-    public GameObject bulletPrefab;       // prefab da bala do inimigo
+    public Transform firePoint;           // Filho "FirePoint" preferencial; fallback = transform
+    public GameObject bulletPrefab;
     public float bulletSpeed = 12f;
     public float fireCooldown = 0.6f;
     public float aimLead = 0.25f;
 
-    [Header("Alvo")]
-    public Transform target;              // defina para o player
+    [Header("Vida & Pontos")]
+    public int maxHealth = 3;             // 3 tiros para destruir
+    public int scoreOnKill = 100;
+
+    [Header("Efeito")]
+    public GameObject explosionPrefab;    // <- arraste o prefab Explosion aqui
 
     Rigidbody2D rb;
     int health;
@@ -30,19 +33,37 @@ public class Enemy : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         health = maxHealth;
-        if (!firePoint)
+
+        // Garante o FirePoint filho local, se existir
+        var childFP = transform.Find("FirePoint");
+        if (childFP != null)
+            firePoint = childFP;
+        else if (firePoint == null || !firePoint.IsChildOf(transform))
+            Debug.LogWarning($"[Enemy] FirePoint ausente ou não-filho em {name}. Usando transform como fallback.");
+    }
+
+    void Start()
+    {
+        if (!target)
         {
-            var fp = transform.Find("FirePoint");
-            if (fp) firePoint = fp;
+            var go = GameObject.FindGameObjectWithTag("Player");
+            if (go) target = go.transform;
+            else Debug.LogWarning("[Enemy] Player com Tag 'Player' não encontrado.");
         }
     }
 
     void Update()
     {
         fireTimer -= Time.deltaTime;
-        if (target) AimAndMove();
-        if (target && fireTimer <= 0f) TryShoot();
-        if (screenWrap) ScreenWrap();
+
+        if (target)
+        {
+            AimAndMove();
+            if (fireTimer <= 0f) TryShoot();
+        }
+
+        if (screenWrap)
+            ScreenWrap();
     }
 
     void AimAndMove()
@@ -52,7 +73,7 @@ public class Enemy : MonoBehaviour
         Vector2 tgtVel = Vector2.zero;
 
         var trb = target.GetComponent<Rigidbody2D>();
-        if (trb) tgtVel = trb.linearVelocity; // troque para trb.velocity se usar 'velocity'
+        if (trb) tgtVel = trb.linearVelocity; // use .velocity se seu projeto estiver assim
 
         Vector2 predicted = tgtPos + tgtVel * aimLead;
         Vector2 dir = (predicted - pos).normalized;
@@ -60,53 +81,49 @@ public class Enemy : MonoBehaviour
         float ang = Vector2.SignedAngle(transform.up, dir);
         transform.Rotate(0, 0, ang * steerStrength * Time.deltaTime);
 
-        rb.linearVelocity = transform.up * moveSpeed; // troque para rb.velocity se preferir
+        rb.linearVelocity = transform.up * moveSpeed;
     }
 
     void TryShoot()
-{
-    if (fireTimer > 0f) return;
-
-    if (!bulletPrefab)
     {
-        Debug.LogWarning($"[Enemy] bulletPrefab não definido em {name}");
-        fireTimer = 0.2f;
-        return;
+        if (!bulletPrefab)
+        {
+            Debug.LogWarning($"[Enemy] bulletPrefab não definido em {name}");
+            fireTimer = 0.2f;
+            return;
+        }
+
+        var fp = (firePoint && firePoint.IsChildOf(transform)) ? firePoint : transform;
+
+        fireTimer = Mathf.Max(0.05f, fireCooldown);
+
+        Vector2 pos = (Vector2)fp.position + (Vector2)fp.up * 0.1f;
+        Quaternion rot = fp.rotation;
+
+        var b = Instantiate(bulletPrefab, pos, rot);
+        var brb = b.GetComponent<Rigidbody2D>();
+        var own = rb ? rb.linearVelocity : Vector2.zero;
+
+        if (brb)
+            brb.linearVelocity = (Vector2)fp.up * bulletSpeed + own * 0.2f;
     }
-
-    // Se esqueceram de ligar no Inspector, usa o transform do Enemy
-    var fp = firePoint ? firePoint : transform;
-
-    fireTimer = Mathf.Max(0.05f, fireCooldown);
-
-    // Nasce um pouco à frente para não colidir com o próprio colisor
-    Vector2 pos = (Vector2)fp.position + (Vector2)fp.up * 0.1f;
-    Quaternion rot = fp.rotation;
-
-    var b = Instantiate(bulletPrefab, pos, rot);
-    var brb = b.GetComponent<Rigidbody2D>();
-    var own = rb ? rb.linearVelocity : Vector2.zero; // troque para rb.velocity se seu projeto usa 'velocity'
-
-    Vector2 dir = (Vector2)fp.up;
-    float speed = Mathf.Max(1f, bulletSpeed);
-
-    if (brb)
-        brb.linearVelocity = dir * speed + own * 0.2f;
-
-    // Debug opcional:
-    // Debug.Log($"[Enemy] Shoot {name} em {Time.time:F2}");
-}
 
     public void Hit(int damage = 1)
     {
-        health -= damage;
+        health -= Mathf.Max(1, damage);
         if (health <= 0) Die();
     }
 
     void Die()
     {
+        // Explosão
+        if (explosionPrefab)
+            Instantiate(explosionPrefab, transform.position, Quaternion.identity);
+
+        // Pontuação
         var gm = FindFirstObjectByType<GameManager>();
-        if (gm) gm.AddScore(scoreOnKill);   // << CORRETO: método, não delegate
+        if (gm) gm.AddScore(scoreOnKill);
+
         Destroy(gameObject);
     }
 
@@ -119,16 +136,4 @@ public class Enemy : MonoBehaviour
         var w = cam.ViewportToWorldPoint(v);
         transform.position = new Vector3(w.x, w.y, 0f);
     }
-
-    void Start()
-{
-    // Se o target não vier do spawner, procura o Player por tag
-    if (!target)
-    {
-        var go = GameObject.FindGameObjectWithTag("Player");
-        if (go) target = go.transform;
-        else Debug.LogWarning("[Enemy] Player com Tag 'Player' não encontrado.");
-    }
-}
-
 }
