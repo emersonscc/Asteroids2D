@@ -1,40 +1,42 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
+[RequireComponent(typeof(Collider2D))]
 public class EnemyBullet : MonoBehaviour
 {
-    public float offscreenMargin = 0.05f;
+    [Tooltip("Tempo de vida da bala (segundos)")]
+    public float lifeSeconds = 3f;
 
-    void Update()
+    void OnEnable()
     {
-        var cam = Camera.main;
-        var v = cam.WorldToViewportPoint(transform.position);
-        if (v.x < -offscreenMargin || v.x > 1f + offscreenMargin ||
-            v.y < -offscreenMargin || v.y > 1f + offscreenMargin)
+        if (lifeSeconds > 0f)
+            Invoke(nameof(SelfDestruct), lifeSeconds);
+    }
+
+    // Caso o collider da bala esteja como "Is Trigger"
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        var ph = other.GetComponent<PlayerHealth>();
+        if (ph != null)
         {
-            Destroy(gameObject);
+            ph.TakeBulletHit();
+            SelfDestruct();
         }
     }
 
-    void OnTriggerEnter2D(Collider2D other)
+    // Caso NÃO seja trigger e use física 2D padrão
+    void OnCollisionEnter2D(Collision2D col)
     {
-        // Acertou o player?
-        if (other.CompareTag("Player") || other.GetComponent<PlayerController>())
+        var ph = col.collider.GetComponent<PlayerHealth>();
+        if (ph != null)
         {
-            // Prioriza usar PlayerHealth (contagem de hits)
-            var ph = other.GetComponent<PlayerHealth>();
-            if (ph)
-            {
-                ph.RegisterHit(1); // 1 hit por bala
-            }
-            else
-            {
-                // Fallback: comportamento antigo (morte imediata) se PlayerHealth não existir
-                var gm = FindFirstObjectByType<GameManager>();
-                if (gm) gm.OnPlayerHit();
-            }
-
-            Destroy(gameObject);
+            ph.TakeBulletHit();
+            SelfDestruct();
         }
+    }
+
+    void SelfDestruct()
+    {
+        if (this != null && gameObject != null)
+            Destroy(gameObject);
     }
 }
