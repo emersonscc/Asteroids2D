@@ -1,58 +1,50 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("Prefabs / Spawns")]
-    public GameObject asteroidLargePrefab;   // opcional (usado pelo SpawnWave inicial)
-    public GameObject playerPrefab;
+    [Header("Prefabs e Spawns")]
+    public GameObject asteroidLargePrefab;
     public Transform playerSpawn;
+    public GameObject playerPrefab;
 
     [Header("UI")]
     public Text scoreText;
-    public GameObject winPopup;              // opcional: arraste um painel de vitória
-    public GameObject gameOverPopup;         // opcional: arraste um painel de game over
+    public GameObject winPopup;                // painel de vitória (desativado por padrão)
 
     [Header("Jogo")]
     public int lives = 3;
 
-    // Estado interno
-    public bool gameEnded;
+    [Header("Restart ao morrer")]
+    public bool restartOnDeath = true;
+    public float restartDelayOnDeath = 2f;
+
     int score;
+    bool gameEnded;
+
+    // Exposição do score para o popup
+    public int CurrentScore => score;
 
     void Start()
     {
-        // Garante que o tempo esteja rodando ao iniciar a cena
-        Time.timeScale = 1f;
-        gameEnded = false;
-
+        if (winPopup) winPopup.SetActive(false);
         SpawnPlayer();
-
-        // Se quiser começar com alguns asteroides (opcional)
-        if (asteroidLargePrefab != null)
-            SpawnWave(4);
-
+        SpawnWave(4);
         UpdateUI();
     }
 
-    // ----- Pontuação / UI -----
-
     public void AddScore(int value)
     {
-        if (gameEnded) return;
         score += value;
         UpdateUI();
     }
 
     void UpdateUI()
     {
-        if (scoreText)
-            scoreText.text = $"SCORE {score}   LIVES {lives}";
+        if (scoreText) scoreText.text = $"SCORE {score}   LIVES {lives}";
     }
 
-    // ----- Dano / Vidas do Jogador -----
-
-    // Chamado quando o Player "morre" (colisão, tiros inimigos suficientes, etc.)
     public void OnPlayerHit()
     {
         if (gameEnded) return;
@@ -60,95 +52,46 @@ public class GameManager : MonoBehaviour
         lives--;
         UpdateUI();
 
-        if (lives > 0)
+        if (restartOnDeath)
         {
-            // Respawn após 1 segundo
-            Invoke(nameof(SpawnPlayer), 1.0f);
+            if (Time.timeScale != 0f) Time.timeScale = 0f;
+            StartCoroutine(RestartAfterDeathDelay());
+            return;
         }
-        else
-        {
-            // Fim de jogo
-            gameEnded = true;
-            Debug.Log("Game Over");
 
-            // Desliga spawners/ameaças em andamento
-            StopAllSpawnersAndThreats();
+        if (lives > 0) Invoke(nameof(SpawnPlayer), 1.0f);
+        else Debug.Log("Game Over");
+    }
 
-            // Mostra UI de game over (opcional)
-            if (gameOverPopup) gameOverPopup.SetActive(true);
+    System.Collections.IEnumerator RestartAfterDeathDelay()
+    {
+        yield return new WaitForSecondsRealtime(restartDelayOnDeath);
+        Time.timeScale = 1f;
+        var scene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(scene.buildIndex);
+    }
 
-            // Pausa o jogo
-            Time.timeScale = 0f;
-        }
+    public void OnPlayerWin()
+    {
+        if (gameEnded) return;
+        gameEnded = true;
+
+        if (winPopup) winPopup.SetActive(true);
+
+        // Pausa para o popup de vitória; o VictoryPopupAuto reinicia depois
+        if (Time.timeScale != 0f) Time.timeScale = 0f;
     }
 
     void SpawnPlayer()
     {
-        if (gameEnded) return;
-        if (!playerPrefab || !playerSpawn)
-        {
-            Debug.LogWarning("[GameManager] playerPrefab ou playerSpawn não setados.");
-            return;
-        }
-
-        var player = Instantiate(playerPrefab, playerSpawn.position, Quaternion.identity);
-
-        // Se reaproveitar o mesmo prefab/objeto, zera os hits no respawn
-        var ph = player.GetComponent<PlayerHealth>();
-        if (ph)
-            ph.ResetHealth();
+        if (playerPrefab && playerSpawn)
+            Instantiate(playerPrefab, playerSpawn.position, Quaternion.identity);
     }
-
-    // ----- Vitória (zona de chegada) -----
-
-    // Chamado pela GoalZone quando o Player entra no trigger do meio (chegou ao planeta)
-    public void OnPlayerWin()
-    {
-        if (gameEnded) return;
-
-        gameEnded = true;
-        Debug.Log("Você alcançou o planeta! Vitória!");
-
-        // Para spawners e "ameaças" ativas
-        StopAllSpawnersAndThreats();
-
-        // Mostra UI de vitória (se houver)
-        if (winPopup) winPopup.SetActive(true);
-
-        // Pausa o jogo
-        Time.timeScale = 0f;
-    }
-
-    // ----- Utilidades internas -----
-
-    void StopAllSpawnersAndThreats()
-    {
-        // Desabilita spawners de inimigos
-        var enemySpawners = FindObjectsByType<EnemySpawner>(FindObjectsSortMode.None);
-        foreach (var sp in enemySpawners)
-            sp.enabled = false;
-
-        // Se houver spawner de asteroides no seu projeto, desabilite aqui:
-        var asteroidSpawners = FindObjectsOfType<MonoBehaviour>(); // genérico
-        foreach (var mb in asteroidSpawners)
-        {
-            // Se você tiver um script AsteroidSpawner, troque o "mb is" abaixo:
-            // if (mb is AsteroidSpawner) mb.enabled = false;
-            // Mantive genérico para não quebrar se o script não existir.
-        }
-
-        // Opcional: congelar o comportamento dos inimigos existentes
-        var enemies = FindObjectsByType<Enemy>(FindObjectsSortMode.None);
-        foreach (var e in enemies)
-            e.enabled = false;
-    }
-
-    // ----- Onda inicial de asteroides (opcional) -----
 
     void SpawnWave(int count)
     {
+        if (!asteroidLargePrefab) return;
         var cam = Camera.main;
-        if (!cam || asteroidLargePrefab == null) return;
 
         for (int i = 0; i < count; i++)
         {
@@ -156,10 +99,11 @@ public class GameManager : MonoBehaviour
                 ? new Vector2(Random.value, Random.value < 0.5f ? -0.05f : 1.05f)
                 : new Vector2(Random.value < 0.5f ? -0.05f : 1.05f, Random.value);
 
-            Vector3 world = cam.ViewportToWorldPoint(new Vector3(edge.x, edge.y, 0f));
-            world.z = 0f;
+            Vector3 world = cam.ViewportToWorldPoint(new Vector3(edge.x, edge.y, 0));
+            world.z = 0;
 
-            var a = Instantiate(asteroidLargePrefab, world, Quaternion.identity).GetComponent<Asteroid>();
+            var go = Instantiate(asteroidLargePrefab, world, Quaternion.identity);
+            var a = go.GetComponent<Asteroid>();
             if (a != null)
             {
                 a.size = Asteroid.Size.Large;

@@ -21,7 +21,7 @@ public class PlayerHealth : MonoBehaviour
     int enemyCollisionHits;         // colisões com inimigos
     bool dead;
 
-    // Chamado no respawn pelo GameManager (se você usa respawn)
+    // Chamado no respawn pelo GameManager (se precisar)
     public void ResetHealth()
     {
         bulletHits = 0;
@@ -64,7 +64,7 @@ public class PlayerHealth : MonoBehaviour
             Instantiate(explosionPrefab, transform.position, Quaternion.identity);
 
         var gm = FindFirstObjectByType<GameManager>();
-        if (gm != null) gm.OnPlayerHit();   // seu fluxo atual de morte/vida
+        if (gm != null) gm.OnPlayerHit();
 
         gameObject.SetActive(false);
     }

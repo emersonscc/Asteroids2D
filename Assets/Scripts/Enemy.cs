@@ -4,7 +4,7 @@ using UnityEngine;
 public class Enemy : MonoBehaviour
 {
     [Header("Alvo")]
-    public Transform target;              // Spawner define; fallback por Tag "Player" no Start
+    public Transform target;
 
     [Header("Movimento")]
     public float moveSpeed = 3f;
@@ -12,18 +12,18 @@ public class Enemy : MonoBehaviour
     public bool screenWrap = true;
 
     [Header("Tiro")]
-    public Transform firePoint;           // Filho "FirePoint" preferencial; fallback = transform
+    public Transform firePoint;
     public GameObject bulletPrefab;
     public float bulletSpeed = 12f;
     public float fireCooldown = 0.6f;
     public float aimLead = 0.25f;
 
     [Header("Vida & Pontos")]
-    public int maxHealth = 3;             // 3 tiros para destruir
-    public int scoreOnKill = 100;
+    public int maxHealth = 3;
+    public int scoreOnKill = 50;        // <- 50 pontos por inimigo destruído
 
     [Header("Efeito")]
-    public GameObject explosionPrefab;    // <- arraste o prefab Explosion aqui
+    public GameObject explosionPrefab;
 
     Rigidbody2D rb;
     int health;
@@ -34,12 +34,8 @@ public class Enemy : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         health = maxHealth;
 
-        // Garante o FirePoint filho local, se existir
         var childFP = transform.Find("FirePoint");
-        if (childFP != null)
-            firePoint = childFP;
-        else if (firePoint == null || !firePoint.IsChildOf(transform))
-            Debug.LogWarning($"[Enemy] FirePoint ausente ou não-filho em {name}. Usando transform como fallback.");
+        if (childFP) firePoint = childFP;
     }
 
     void Start()
@@ -48,7 +44,6 @@ public class Enemy : MonoBehaviour
         {
             var go = GameObject.FindGameObjectWithTag("Player");
             if (go) target = go.transform;
-            else Debug.LogWarning("[Enemy] Player com Tag 'Player' não encontrado.");
         }
     }
 
@@ -62,8 +57,7 @@ public class Enemy : MonoBehaviour
             if (fireTimer <= 0f) TryShoot();
         }
 
-        if (screenWrap)
-            ScreenWrap();
+        if (screenWrap) ScreenWrap();
     }
 
     void AimAndMove()
@@ -73,7 +67,7 @@ public class Enemy : MonoBehaviour
         Vector2 tgtVel = Vector2.zero;
 
         var trb = target.GetComponent<Rigidbody2D>();
-        if (trb) tgtVel = trb.linearVelocity; // use .velocity se seu projeto estiver assim
+        if (trb) tgtVel = trb.linearVelocity;
 
         Vector2 predicted = tgtPos + tgtVel * aimLead;
         Vector2 dir = (predicted - pos).normalized;
@@ -88,13 +82,11 @@ public class Enemy : MonoBehaviour
     {
         if (!bulletPrefab)
         {
-            Debug.LogWarning($"[Enemy] bulletPrefab não definido em {name}");
             fireTimer = 0.2f;
             return;
         }
 
-        var fp = (firePoint && firePoint.IsChildOf(transform)) ? firePoint : transform;
-
+        var fp = firePoint ? firePoint : transform;
         fireTimer = Mathf.Max(0.05f, fireCooldown);
 
         Vector2 pos = (Vector2)fp.position + (Vector2)fp.up * 0.1f;
@@ -104,8 +96,7 @@ public class Enemy : MonoBehaviour
         var brb = b.GetComponent<Rigidbody2D>();
         var own = rb ? rb.linearVelocity : Vector2.zero;
 
-        if (brb)
-            brb.linearVelocity = (Vector2)fp.up * bulletSpeed + own * 0.2f;
+        if (brb) brb.linearVelocity = (Vector2)fp.up * bulletSpeed + own * 0.2f;
     }
 
     public void Hit(int damage = 1)
@@ -116,13 +107,11 @@ public class Enemy : MonoBehaviour
 
     void Die()
     {
-        // Explosão
         if (explosionPrefab)
             Instantiate(explosionPrefab, transform.position, Quaternion.identity);
 
-        // Pontuação
         var gm = FindFirstObjectByType<GameManager>();
-        if (gm) gm.AddScore(scoreOnKill);
+        if (gm) gm.AddScore(scoreOnKill);   // <- soma 50 pontos
 
         Destroy(gameObject);
     }
