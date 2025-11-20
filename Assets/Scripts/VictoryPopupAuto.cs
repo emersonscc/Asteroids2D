@@ -2,54 +2,38 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-#if TMP_PRESENT || TEXTMESHPRO_PRESENT
-using TMPro;
-#endif
 
 public class VictoryPopupAuto : MonoBehaviour
 {
     [Header("Exibição")]
-    public Text uiText;          // Legacy UI Text (opcional)
-#if TMP_PRESENT || TEXTMESHPRO_PRESENT
-    public TMP_Text tmpText;     // TextMeshPro (opcional)
-#endif
+    public Text uiText;                 // UI Text (Legacy) do Title
     public string baseMessage = "VOCÊ VENCEU!";
 
     [Header("Fluxo")]
-    public float holdSeconds = 2f;
+    public float holdSeconds = 2f;      // quanto tempo o popup fica na tela
     public bool pauseOnShow = true;
+    public string menuSceneName = "MainMenu"; // <- voltar ao menu
 
     void OnEnable()
     {
-        // Tenta auto-descobrir textos se não estiverem atribuídos
-        if (!uiText)
-            uiText = GetComponentInChildren<Text>(true);
-#if TMP_PRESENT || TEXTMESHPRO_PRESENT
-        if (!tmpText)
-            tmpText = GetComponentInChildren<TMP_Text>(true);
-#endif
+        if (!uiText) uiText = GetComponentInChildren<Text>(true);
 
-        // Monta mensagem com score atual
         var gm = FindFirstObjectByType<GameManager>();
         string msg = baseMessage;
-        if (gm) msg = $"{baseMessage}\nSCORE {gm.CurrentScore}";
-
+        if (gm != null) msg = $"{baseMessage}\nSCORE {gm.CurrentScore}";
         if (uiText) uiText.text = msg;
-#if TMP_PRESENT || TEXTMESHPRO_PRESENT
-        if (tmpText) tmpText.text = msg;
-#endif
 
         if (pauseOnShow && Time.timeScale != 0f)
             Time.timeScale = 0f;
 
-        StartCoroutine(RestartAfterDelay());
+        StartCoroutine(GoToMenuAfter());
     }
 
-    IEnumerator RestartAfterDelay()
+    IEnumerator GoToMenuAfter()
     {
         yield return new WaitForSecondsRealtime(holdSeconds);
         Time.timeScale = 1f;
-        var cur = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(cur.buildIndex);
+        if (!string.IsNullOrEmpty(menuSceneName))
+            SceneManager.LoadScene(menuSceneName);
     }
 }

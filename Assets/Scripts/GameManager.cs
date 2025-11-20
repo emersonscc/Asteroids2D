@@ -16,14 +16,16 @@ public class GameManager : MonoBehaviour
     [Header("Jogo")]
     public int lives = 3;
 
-    [Header("Restart ao morrer")]
-    public bool restartOnDeath = true;
-    public float restartDelayOnDeath = 2f;
+    [Header("Cenas")]
+    public string menuSceneName = "MainMenu";  // <- nome da cena do menu
+    public string gameSceneName = "Game";      // opcional, se precisar
+
+    [Header("Tempos")]
+    public float restartDelayOnDeath = 2f;     // delay para voltar ao menu quando morrer
 
     int score;
     bool gameEnded;
 
-    // Exposição do score para o popup
     public int CurrentScore => score;
 
     void Start()
@@ -34,6 +36,7 @@ public class GameManager : MonoBehaviour
         UpdateUI();
     }
 
+    // ======= Pontuação =======
     public void AddScore(int value)
     {
         score += value;
@@ -45,6 +48,7 @@ public class GameManager : MonoBehaviour
         if (scoreText) scoreText.text = $"SCORE {score}   LIVES {lives}";
     }
 
+    // ======= Jogador morreu (tiros/colisões) -> voltar ao menu =======
     public void OnPlayerHit()
     {
         if (gameEnded) return;
@@ -52,36 +56,31 @@ public class GameManager : MonoBehaviour
         lives--;
         UpdateUI();
 
-        if (restartOnDeath)
-        {
-            if (Time.timeScale != 0f) Time.timeScale = 0f;
-            StartCoroutine(RestartAfterDeathDelay());
-            return;
-        }
-
-        if (lives > 0) Invoke(nameof(SpawnPlayer), 1.0f);
-        else Debug.Log("Game Over");
+        // Sempre voltar ao menu na morte
+        if (Time.timeScale != 0f) Time.timeScale = 0f;
+        StartCoroutine(ReturnToMenuAfter(restartDelayOnDeath));
     }
 
-    System.Collections.IEnumerator RestartAfterDeathDelay()
+    System.Collections.IEnumerator ReturnToMenuAfter(float delay)
     {
-        yield return new WaitForSecondsRealtime(restartDelayOnDeath);
+        yield return new WaitForSecondsRealtime(delay);
         Time.timeScale = 1f;
-        var scene = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(scene.buildIndex);
+        if (!string.IsNullOrEmpty(menuSceneName))
+            SceneManager.LoadScene(menuSceneName);
     }
 
+    // ======= Vitória (goal no planeta) =======
     public void OnPlayerWin()
     {
         if (gameEnded) return;
         gameEnded = true;
 
-        if (winPopup) winPopup.SetActive(true);
-
-        // Pausa para o popup de vitória; o VictoryPopupAuto reinicia depois
-        if (Time.timeScale != 0f) Time.timeScale = 0f;
+        if (winPopup) winPopup.SetActive(true);  // popup mostra SCORE e segura ~2s
+        if (Time.timeScale != 0f) Time.timeScale = 0f; // pausa para o popup
+        // O retorno ao menu, no caso da vitória, será feito pelo VictoryPopupAuto.
     }
 
+    // ======= Utilidades =======
     void SpawnPlayer()
     {
         if (playerPrefab && playerSpawn)
