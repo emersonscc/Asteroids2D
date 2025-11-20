@@ -107,14 +107,16 @@ public class Enemy : MonoBehaviour
 
     void Die()
     {
-        if (explosionPrefab)
-            Instantiate(explosionPrefab, transform.position, Quaternion.identity);
+    if (explosionPrefab)
+        Instantiate(explosionPrefab, transform.position, Quaternion.identity);
 
-        var gm = FindFirstObjectByType<GameManager>();
-        if (gm) gm.AddScore(scoreOnKill);   // <- soma 50 pontos
+    // Contabiliza kill e score UMA única vez
+    GameManager.Instance?.RegisterEnemyDestroyed();
+    GameManager.Instance?.AddScore(scoreOnKill);
+    Destroy(gameObject);
 
-        Destroy(gameObject);
     }
+
 
     void ScreenWrap()
     {

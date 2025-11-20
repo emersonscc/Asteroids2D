@@ -76,4 +76,13 @@ public static class LeaderboardManager
         if (lines.Count == 0) lines.Add("Sem registros ainda.");
         return string.Join("\n", lines);
     }
+
+    public static void ClearLeaderboard()
+{
+    PlayerPrefs.DeleteKey("leaderboard_v1");      // zera o ranking
+    // opcional: também limpar o último nome digitado
+    // PlayerPrefs.DeleteKey("player_name_current");
+    PlayerPrefs.Save();
+}
+
 }

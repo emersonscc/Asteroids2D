@@ -1,64 +1,79 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using System.Text.RegularExpressions;
 
 public class MenuManager : MonoBehaviour
 {
-    [Header("Cena do jogo")]
-    public string gameSceneName = "SampleScene";
+    public string gameSceneName = "Game";
+    public InputField playerNameInput;
+    public Button easyButton;
+    public Button hardButton;
+    public Text leaderboardText;
+    public Text errorText;
+    public bool autoRefreshLeaderboard = true;
+    public float refreshDelay = 0.2f;
+    public const string PP_MinKillsKey = "minKillsForRanking_menu";
 
-    [Header("Entrada de nome")]
-    public InputField playerNameInput;   // arraste o PlayerNameInput (Legacy)
-    public Button startButton;           // arraste o StartButton
-
-    [Header("Leaderboard (sempre visível)")]
-    public Text leaderboardText;         // arraste o Text "LeaderboardText" no Canvas
+    const int MinLen = 2;
+    static readonly Regex Allowed = new Regex(@"^[\p{L}\p{Nd} ]+$", RegexOptions.Compiled);
 
     void Start()
     {
-        // Recarrega último nome usado
-        if (playerNameInput)
-        {
-            playerNameInput.text = LeaderboardManager.CurrentPlayerName;
-            playerNameInput.onValueChanged.AddListener(_ => UpdateStartButton());
-        }
-        UpdateStartButton();
-
-        // Mostra leaderboard imediatamente…
+        playerNameInput.text = LeaderboardManager.CurrentPlayerName;
+        playerNameInput.onValueChanged.AddListener(_ => RefreshButtons());
+        RefreshButtons();
         RefreshLeaderboard();
-
-        // …e de novo um pouquinho depois (garante persistência ao voltar do jogo)
-        Invoke(nameof(RefreshLeaderboard), 0.2f);
+        if (autoRefreshLeaderboard) Invoke(nameof(RefreshLeaderboard), refreshDelay);
+        easyButton.onClick.AddListener(StartEasy);
+        hardButton.onClick.AddListener(StartHard);
     }
 
-    void UpdateStartButton()
+    void RefreshButtons()
     {
-        if (startButton && playerNameInput)
-            startButton.interactable = !string.IsNullOrWhiteSpace(playerNameInput.text);
+        bool ok = IsValid(playerNameInput.text);
+        easyButton.interactable = ok;
+        hardButton.interactable = ok;
+        if (errorText)
+            errorText.text = ok ? "" : "Informe um nome (mín. 2 caracteres, apenas letras/números).";
     }
 
-    public void StartGame()
+    bool IsValid(string raw)
     {
-        if (playerNameInput)
-            LeaderboardManager.CurrentPlayerName = playerNameInput.text.Trim();
+        if (string.IsNullOrWhiteSpace(raw)) return false;
+        string t = raw.Trim();
+        if (t.Length < MinLen) return false;
+        if (!Allowed.IsMatch(t)) return false;
+        return true;
+    }
 
+    public void StartEasy()  { StartWithDifficulty(5); }
+    public void StartHard()  { StartWithDifficulty(10); }
+
+    void StartWithDifficulty(int minKillsRequired)
+    {
+        if (!IsValid(playerNameInput.text)) { RefreshButtons(); return; }
+        LeaderboardManager.CurrentPlayerName = playerNameInput.text.Trim();
+        PlayerPrefs.SetInt(PP_MinKillsKey, minKillsRequired);
+        PlayerPrefs.Save();
         Time.timeScale = 1f;
         SceneManager.LoadScene(gameSceneName);
     }
 
-    void RefreshLeaderboard()
+    public void RefreshLeaderboard()
     {
         if (leaderboardText)
             leaderboardText.text = LeaderboardManager.FormatLeaderboardText();
     }
 
-    // (Opcional) Sair em build
-    public void Quit()
+    void Update()
+{
+    // Ao pressionar R, apaga todo o ranking
+    if (Input.GetKeyDown(KeyCode.R))
     {
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
+        LeaderboardManager.ClearLeaderboard();
+        RefreshLeaderboard(); // atualiza o texto no menu
+        Debug.Log("Ranking resetado.");
     }
+}
 }
