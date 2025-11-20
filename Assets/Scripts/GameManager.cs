@@ -1,113 +1,128 @@
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
-    [Header("Prefabs e Spawns")]
-    public GameObject asteroidLargePrefab;
+    public static GameManager Instance;
+
+    [Header("Cenas & Fluxo")]
+    [Tooltip("Nome da cena do Menu principal (índice 0 no Build Profiles).")]
+    public string menuSceneName = "MainMenu";
+    [Tooltip("Atraso (seg, tempo real) para voltar ao menu quando não houver popup.")]
+    public float restartDelayOnEnd = 2f;
+
+    [Header("Player (opcional)")]
     public Transform playerSpawn;
     public GameObject playerPrefab;
 
-    [Header("UI")]
-    public Text scoreText;
-    public GameObject winPopup;                // painel de vitória (desativado por padrão)
+    [Header("UI (HUD)")]
+    public Text scoreText;                      // Text (Legacy) do HUD
 
-    [Header("Jogo")]
-    public int lives = 3;
+    [Header("Popup de Vitória (opcional)")]
+    [Tooltip("Se definido, será ativado na vitória (ex.: Canvas com VictoryPopupAuto).")]
+    public GameObject victoryPopupGO;
 
-    [Header("Cenas")]
-    public string menuSceneName = "MainMenu";  // <- nome da cena do menu
-    public string gameSceneName = "Game";      // opcional, se precisar
-
-    [Header("Tempos")]
-    public float restartDelayOnDeath = 2f;     // delay para voltar ao menu quando morrer
-
+    // ----- Estado interno -----
     int score;
-    bool gameEnded;
+    bool scoreSubmitted;
 
+    /// <summary>Pontuação atual (para outros scripts/HUDs).</summary>
     public int CurrentScore => score;
+
+    void Awake()
+    {
+        if (Instance == null) Instance = this;
+        else if (Instance != this) Destroy(gameObject);
+    }
 
     void Start()
     {
-        if (winPopup) winPopup.SetActive(false);
-        SpawnPlayer();
-        SpawnWave(4);
-        UpdateUI();
-    }
-
-    // ======= Pontuação =======
-    public void AddScore(int value)
-    {
-        score += value;
-        UpdateUI();
-    }
-
-    void UpdateUI()
-    {
-        if (scoreText) scoreText.text = $"SCORE {score}   LIVES {lives}";
-    }
-
-    // ======= Jogador morreu (tiros/colisões) -> voltar ao menu =======
-    public void OnPlayerHit()
-    {
-        if (gameEnded) return;
-
-        lives--;
-        UpdateUI();
-
-        // Sempre voltar ao menu na morte
-        if (Time.timeScale != 0f) Time.timeScale = 0f;
-        StartCoroutine(ReturnToMenuAfter(restartDelayOnDeath));
-    }
-
-    System.Collections.IEnumerator ReturnToMenuAfter(float delay)
-    {
-        yield return new WaitForSecondsRealtime(delay);
         Time.timeScale = 1f;
-        if (!string.IsNullOrEmpty(menuSceneName))
-            SceneManager.LoadScene(menuSceneName);
+        scoreSubmitted = false;
+        UpdateUI();
+
+        // Spawn opcional se não houver Player na cena
+        if (playerSpawn && playerPrefab && GameObject.FindGameObjectWithTag("Player") == null)
+            SpawnPlayer();
     }
 
-    // ======= Vitória (goal no planeta) =======
-    public void OnPlayerWin()
-    {
-        if (gameEnded) return;
-        gameEnded = true;
-
-        if (winPopup) winPopup.SetActive(true);  // popup mostra SCORE e segura ~2s
-        if (Time.timeScale != 0f) Time.timeScale = 0f; // pausa para o popup
-        // O retorno ao menu, no caso da vitória, será feito pelo VictoryPopupAuto.
-    }
-
-    // ======= Utilidades =======
-    void SpawnPlayer()
+    // =================== Player ===================
+    public void SpawnPlayer()
     {
         if (playerPrefab && playerSpawn)
             Instantiate(playerPrefab, playerSpawn.position, Quaternion.identity);
     }
 
-    void SpawnWave(int count)
+    // =================== Score ====================
+    public void AddScore(int value)
     {
-        if (!asteroidLargePrefab) return;
-        var cam = Camera.main;
+        if (value <= 0) return;
+        score += value;
+        UpdateUI();
+    }
 
-        for (int i = 0; i < count; i++)
+    public void ResetScore()
+    {
+        score = 0;
+        scoreSubmitted = false;
+        UpdateUI();
+    }
+
+    void UpdateUI()
+    {
+        if (scoreText)
+            scoreText.text = $"SCORE {score:D5}";
+    }
+
+    // ============ Fim de jogo: Morte ==============
+    /// <summary>Chame quando o jogador for destruído (tiros/colisões).</summary>
+    public void OnPlayerHit()
+    {
+        SubmitScoreOnce();
+        StartCoroutine(ReturnToMenuAfterDelay());
+    }
+
+    // ============ Fim de jogo: Vitória =============
+    /// <summary>Chame quando o jogador atingir o objetivo (ex.: Goal/Planeta).</summary>
+    public void OnPlayerWin()
+    {
+        SubmitScoreOnce();
+
+        if (victoryPopupGO != null)
         {
-            Vector2 edge = Random.value > 0.5f
-                ? new Vector2(Random.value, Random.value < 0.5f ? -0.05f : 1.05f)
-                : new Vector2(Random.value < 0.5f ? -0.05f : 1.05f, Random.value);
-
-            Vector3 world = cam.ViewportToWorldPoint(new Vector3(edge.x, edge.y, 0));
-            world.z = 0;
-
-            var go = Instantiate(asteroidLargePrefab, world, Quaternion.identity);
-            var a = go.GetComponent<Asteroid>();
-            if (a != null)
-            {
-                a.size = Asteroid.Size.Large;
-                a.Launch(Random.insideUnitCircle.normalized);
-            }
+            // Seu VictoryPopupAuto cuida de pausar/mostrar texto/voltar ao menu.
+            victoryPopupGO.SetActive(true);
+            return;
         }
+
+        // Fallback simples: volta ao menu após um atraso
+        StartCoroutine(ReturnToMenuAfterDelay());
+    }
+
+    // ============ Leaderboard ======================
+    void SubmitScoreOnce()
+    {
+        if (scoreSubmitted) return;
+
+        // Nome atual foi salvo pelo MenuManager antes de iniciar o jogo
+        LeaderboardManager.SubmitScore(
+            LeaderboardManager.CurrentPlayerName,
+            score
+        );
+        scoreSubmitted = true;
+    }
+
+    // ============ Navegação ========================
+    System.Collections.IEnumerator ReturnToMenuAfterDelay()
+    {
+        // Usa tempo real para independência de Time.timeScale
+        float end = Time.realtimeSinceStartup + restartDelayOnEnd;
+        while (Time.realtimeSinceStartup < end)
+            yield return null;
+
+        Time.timeScale = 1f;
+        if (!string.IsNullOrEmpty(menuSceneName))
+            SceneManager.LoadScene(menuSceneName);
     }
 }
