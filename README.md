@@ -3,7 +3,7 @@
 Um clone do clássico **Asteroids** (com naves inimigas, ranking e menu) desenvolvido em **Unity 2D**. O projeto foi construído em etapas para fins de estudo, mantendo a jogabilidade simples e clara.
 
 ## Links 
-- Executável do jogo (Asteroids2D/Run/My Project.exe) : https://drive.google.com/file/d/1nlgZb8hpeQULTmuKf5vvm-MfyDLlR0v7/view?usp=sharing
+- Executável do jogo no Windows (Asteroids2D/Run/My Project.exe) : https://drive.google.com/file/d/1nlgZb8hpeQULTmuKf5vvm-MfyDLlR0v7/view?usp=sharing
 - Vídeo Demo do jogo: https://drive.google.com/file/d/1i3C16e-Wz5xzDj_j1a1AQzMl9Q9ylEws/view?usp=sharing
 
 ## Sumário
