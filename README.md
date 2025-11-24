@@ -51,8 +51,8 @@ No **menu principal** existem dois botões:
 ## Regras de Dano e Destruição
 - **Nave do jogador**
   - **Tiros inimigos:** ao ser atingida **30 vezes** no total, a nave é destruída (reinicia/volta ao menu conforme a lógica do jogo).
-  - **Colisão com asteroides:** após **5 colisões** a nave é destruída.
-  - **Colisão com inimigos:** após **5 colisões** a nave é destruída.
+  - **Colisão com asteroides:** após **5 colisões** a nave é destruída. A colisão danifica a nave do jogador, que terá seu movimento de giro prejudicado.
+  - **Colisão com inimigos:** após **5 colisões** a nave é destruída. A colisão danifica a nave do jogador, que terá seu movimento de giro prejudicado.
 - **Naves inimigas**
   - Precisam de **3 tiros** do jogador para serem destruídas (valor definido no prefab).
 - **Asteroides**
