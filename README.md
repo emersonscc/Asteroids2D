@@ -36,7 +36,7 @@ Um clone do clássico **Asteroids** (com naves inimigas, ranking e menu) desenvo
   2) **Destrói ao menos N inimigos** (N depende da dificuldade; ver abaixo).
 
 ## Pontuação
-- **+50 pontos** por **inimigo** destruído (valor padrão).  
+- **+100 pontos** por **inimigo** destruído (valor padrão).  
 - (Se você ajustar `scoreOnKill` nos prefabs/scripts do inimigo, o HUD refletirá automaticamente.)  
 - O **HUD** exibe o placar atual durante a partida.
 
