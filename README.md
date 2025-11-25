@@ -138,3 +138,4 @@ Assets/
 - **MenuManager:** `gameSceneName` deve corresponder ao nome da cena do jogo.
 - **UI (Legacy):** Canvas com **Graphic Raycaster** e EventSystem **Standalone Input Module** (ou Input System UI compatível).
 - **PlayerPrefs:** dados de ranking e dificuldade são persistidos; para limpar tudo use `PlayerPrefs.DeleteAll()` (apenas para testes).
+- Para testar o arquivo .zip gerado por este repositório na Unity Hub, será necessário apenas ligar os **sprites** aos respectivos **prefabs**.
